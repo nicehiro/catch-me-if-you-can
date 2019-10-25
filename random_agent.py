@@ -1,7 +1,5 @@
 import random
 
-import torch
-
 from grid_world.envs import MAEAgent
 
 
@@ -25,4 +23,4 @@ class RandomAgent(MAEAgent):
         self.actions_n = self.action_space.n
 
     def act(self, state):
-        return torch.tensor([[random.randrange(self.actions_n)]])
+        return random.randrange(self.actions_n)

@@ -1,3 +1,5 @@
+import random
+
 import torch
 
 from dqn import DQN
@@ -25,9 +27,15 @@ class GreedyAgent(MAEAgent):
         )
         self.load_path = load_path
         self.features_n = features_n
-        self.policy_net = DQN(self.features_n, env.action_space.n, 20, 20)
+        self.policy_net = DQN(self.features_n, env.action_space.n, 50, 50, 50)
         self.policy_net.load_state_dict(torch.load(self.load_path))
+        self.actions_n = env.action_space.n
 
     def act(self, state):
+        visits = self.get_visits(int(state[0]), int(state[1]))
+        if visits >= 5:
+            return random.randrange(self.actions_n)
         with torch.no_grad():
-            return self.policy_net(state).max(1)[1].view(1, 1)
+            state = torch.FloatTensor([state])
+            action = self.policy_net(state).max(1)[1].view(1, 1)
+            return action.item()
