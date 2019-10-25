@@ -3,11 +3,13 @@ import torch.distributions as distributions
 import torch.optim as optim
 from grid_world.envs import MAEAgent
 
-from policy_net import PolicyNet
+from net.policy_net import PolicyNet
 import numpy as np
 
 
 class PolicyGradAgent(MAEAgent):
+    """The agent model that can use REINFORCE algorithm to train.
+    """
 
     def __init__(self,
                  default_reward,
@@ -57,6 +59,8 @@ class PolicyGradAgent(MAEAgent):
         return action.unsqueeze(0)
 
     def _discount_and_norm_rewards(self):
+        """Calc every state's return when an episode finished.
+        """
         G = []
         temp = 0
         for r in self.rewards[::-1]:

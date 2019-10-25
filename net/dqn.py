@@ -2,8 +2,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-
 class DQN(nn.Module):
+    """DQN net.
+    Three fully connected hiden layer.
+    """
 
     def __init__(self, features_n, outputs_n, layer1_kernels_n, layer2_kernels_n, layer3_kernels_n):
         super(DQN, self).__init__()

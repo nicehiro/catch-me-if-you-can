@@ -2,11 +2,13 @@ import random
 
 import torch
 
-from dqn import DQN
+from net.dqn import DQN
 from grid_world.envs import MAEAgent
 
 
 class GreedyAgent(MAEAgent):
+    """Agent use greedy policy to chose action.
+    """
 
     def __init__(self,
                  default_reward,

@@ -3,6 +3,9 @@ import torch
 
 
 class PolicyNet(nn.Module):
+    """Policy Net.
+    Three fully connected hiden layers with softmax output.
+    """
 
     def __init__(self, features_n, outputs_n, layer1_n, layer2_n, layer3_n):
         super(PolicyNet, self).__init__()

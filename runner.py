@@ -1,13 +1,11 @@
 import time
 
 import gym
-import torch
 
-from greedy_agent import GreedyAgent
-from greedy_probs_agent import GreedyProbsAgent
+from agent.greedy_agent import GreedyAgent
+from agent.greedy_probs_agent import GreedyProbsAgent
 from grid_world.envs import AgentType
-from policy_grad_agent import PolicyGradAgent
-from utils import get_reverse_action
+from agent.policy_grad_agent import PolicyGradAgent
 
 
 def train_runner(env_name,

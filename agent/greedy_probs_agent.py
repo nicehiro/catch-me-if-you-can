@@ -2,10 +2,12 @@ import torch
 import torch.distributions as distributions
 
 from grid_world.envs import MAEAgent
-from policy_net import PolicyNet
+from net.policy_net import PolicyNet
 
 
 class GreedyProbsAgent(MAEAgent):
+    """Chose action use probs.
+    """
 
     def __init__(self,
                  default_reward,

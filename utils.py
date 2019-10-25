@@ -1,13 +1,13 @@
 import random
 from collections import namedtuple
 
-import torch
-
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward'))
 
 
 class ReplayMemory(object):
+    """Memory Replay list.
+    """
 
     def __init__(self, capacity):
         self.capacity = capacity
@@ -47,6 +47,11 @@ class TransitionList(object):
 
 
 def get_reverse_action(action):
+    """When chaser chose 'right' action to chase runner, that equals to runner chose an
+    'reversed action' to be chased by chaser.
+
+    This function can get that reversed action.
+    """
     if action == 0:
         action = 1
     if action == 1:

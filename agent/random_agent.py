@@ -4,6 +4,8 @@ from grid_world.envs import MAEAgent
 
 
 class RandomAgent(MAEAgent):
+    """Chose action randomly.
+    """
 
     def __init__(self,
                  default_reward,

@@ -1,12 +1,11 @@
 import time
 
 import gym
-import torch
 
-from e_greedy_agent import EGreedyAgent
-from greedy_agent import GreedyAgent
+from agent.e_greedy_agent import EGreedyAgent
+from agent.greedy_agent import GreedyAgent
 from grid_world.envs import AgentType
-from random_agent import RandomAgent
+from agent.random_agent import RandomAgent
 from utils import get_reverse_action
 
 
@@ -18,7 +17,7 @@ def chaser_dqn(env_name,
                reload_path=None):
     """Use DQN to train Chaser to chase a random runner agent.
     """
-    env = gym.make(env_name>)
+    env = gym.make(env_name)
     # Epsilon Greedy agent with network to make policy
     chaser = EGreedyAgent(default_reward=-1.0,
                           name='chaser',

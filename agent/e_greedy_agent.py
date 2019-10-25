@@ -5,12 +5,14 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
-from dqn import DQN
+from net.dqn import DQN
 from grid_world.envs import MAEAgent
 from utils import ReplayMemory, Transition
 
 
 class EGreedyAgent(MAEAgent):
+    """Epsilon greedy agent.
+    """
 
     def __init__(self,
                  default_reward,
@@ -89,7 +91,6 @@ class EGreedyAgent(MAEAgent):
         state_batch = torch.cat([torch.tensor([s], dtype=torch.float) for s in batch.state])
         action_batch = torch.cat([torch.tensor([[s]], dtype=torch.long) for s in batch.action])
         reward_batch = torch.cat([torch.tensor([[s]], dtype=torch.float) for s in batch.reward])
-
         q_eval = self.policy_net(state_batch).gather(1, action_batch)
         q_next = torch.zeros(self.batch_size, device=self.device)
         q_next[non_final_mask] = self.target_net(non_final_next_states).max(1)[0].detach()
