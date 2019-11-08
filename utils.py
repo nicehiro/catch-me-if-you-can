@@ -53,11 +53,10 @@ def get_reverse_action(action):
     This function can get that reversed action.
     """
     if action == 0:
-        action = 1
+        return 1
     if action == 1:
-        action = 0
+        return 0
     if action == 2:
-        action = 3
+        return 3
     if action == 3:
-        action = 2
-    return action
+        return 2

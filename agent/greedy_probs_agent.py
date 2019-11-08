@@ -33,6 +33,9 @@ class GreedyProbsAgent(MAEAgent):
         self.policy_net.load_state_dict(torch.load(self.restore_path))
 
     def act(self, state):
+        """
+        Chose action use probs .
+        """
         with torch.no_grad():
             state = torch.tensor([state], dtype=torch.float)
             actions_probs = self.policy_net(state)

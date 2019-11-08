@@ -23,13 +23,14 @@ class EGreedyAgent(MAEAgent):
                  features_n,
                  memory_capacity,
                  init_value=0.0,
-                 batch_size=128,
-                 gamma=0.9,
+                 batch_size=256,
+                 gamma=0.99,
                  eps_start=0.9,
-                 eps_end=0.1,
+                 eps_end=0.01,
                  eps_decay=50,
                  need_reload=False,
-                 reload_path=None):
+                 reload_path=None,
+                 need_exploit=True):
         super(EGreedyAgent, self).__init__(
             (0, 0),
             default_reward=default_reward,
@@ -40,6 +41,7 @@ class EGreedyAgent(MAEAgent):
             default_value=init_value
         )
         self.actions_n = env.action_space.n
+        # discounted value
         self.gamma = gamma
         self.batch_size = batch_size
         self.eps_start = eps_start
@@ -56,10 +58,12 @@ class EGreedyAgent(MAEAgent):
         self.target_net = DQN(self.features_n, self.actions_n, 50, 50, 50)
         if need_reload:
             self.restore(reload_path)
+        # let target net has the same params as policy net
         self.target_net.eval()
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.optimizer = optim.RMSprop(self.policy_net.parameters(), lr=0.01)
         self.save_file_path = './model/'
+        self.need_exploit = need_exploit
 
     def act(self, state):
         """Chose action greedily.
@@ -69,8 +73,9 @@ class EGreedyAgent(MAEAgent):
         state = torch.FloatTensor([state])
         sample = random.random()
         # chose action randomly at the beginning, then slowly chose max Q_value
-        eps_threhold = self.eps_end + (self.eps_start - self.eps_end) * \
-            math.exp(-1. * self.steps_count / self.eps_decay)
+        eps_threhold = self.ep.s_end + (self.eps_start - self.eps_end) * \
+            math.exp(-1. * self.steps_count / self.eps_decay) \
+                if self.need_exploit else 0.01
         self.steps_count += 1
         if sample > eps_threhold:
             with torch.no_grad():
@@ -79,6 +84,9 @@ class EGreedyAgent(MAEAgent):
             return random.randrange(self.actions_n)
 
     def optimize_model(self):
+        """
+        Train model.
+        """
         if len(self.memory) < self.batch_size:
             return 0.0
         transitions = self.memory.sample(self.batch_size)
@@ -86,27 +94,36 @@ class EGreedyAgent(MAEAgent):
         batch = Transition(*zip(*transitions))
         non_final_mask = torch.tensor(tuple(map(lambda s: s is not None,
                                                 batch.next_state)), device=self.device)
-        non_final_next_states = torch.cat([torch.tensor([s], dtype=torch.float) \
-            for s in batch.next_state if s is not None])
-        state_batch = torch.cat([torch.tensor([s], dtype=torch.float) for s in batch.state])
-        action_batch = torch.cat([torch.tensor([[s]], dtype=torch.long) for s in batch.action])
-        reward_batch = torch.cat([torch.tensor([[s]], dtype=torch.float) for s in batch.reward])
+        non_final_next_states = torch.cat([torch.tensor([s], dtype=torch.float)
+                                           for s in batch.next_state if s is not None])
+        state_batch = torch.cat(
+            [torch.tensor([s], dtype=torch.float) for s in batch.state])
+        action_batch = torch.cat(
+            [torch.tensor([[s]], dtype=torch.long) for s in batch.action])
+        reward_batch = torch.cat(
+            [torch.tensor([[s]], dtype=torch.float) for s in batch.reward])
         q_eval = self.policy_net(state_batch).gather(1, action_batch)
         q_next = torch.zeros(self.batch_size, device=self.device)
-        q_next[non_final_mask] = self.target_net(non_final_next_states).max(1)[0].detach()
-        q_target = (q_next * self.gamma) + reward_batch
+        q_next[non_final_mask] = self.target_net(
+            non_final_next_states).max(1)[0].detach()
+        q_target = (q_next * self.gamma) + reward_batch.squeeze()
 
         loss = F.mse_loss(q_eval, q_target.unsqueeze(1))
-
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
         return loss.item()
 
     def save(self, name):
+        """
+        Save trained model to model/`name.
+        """
         torch.save(self.target_net.state_dict(), self.save_file_path + name)
 
     def restore(self, path):
+        """
+        Restore model from `path.
+        """
         params = torch.load(path)
         self.target_net.load_state_dict(params)
         self.policy_net.load_state_dict(params)
