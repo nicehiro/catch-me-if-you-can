@@ -15,8 +15,8 @@ class GreedyProbsAgent(MAEAgent):
                  color,
                  env,
                  agent_type,
-                 restore_path,
-                 features_n):
+                 features_n,
+                 policy_net):
         super(GreedyProbsAgent, self).__init__(
             (0, 0),
             default_reward=default_reward,
@@ -26,11 +26,9 @@ class GreedyProbsAgent(MAEAgent):
             default_type=agent_type,
             default_value=0.0
         )
-        self.restore_path = restore_path
         self.features_n = features_n
         self.actions_n = env.action_space.n
-        self.policy_net = PolicyNet(self.features_n, self.actions_n, 50, 50, 50)
-        self.policy_net.load_state_dict(torch.load(self.restore_path))
+        self.policy_net = policy_net
 
     def act(self, state):
         """

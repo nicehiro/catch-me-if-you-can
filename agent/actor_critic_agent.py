@@ -36,6 +36,7 @@ class ActorCriticAgent(MAEAgent):
             default_type=agent_type,
             default_value=init_value
         )
+        self.epi = 0
         self.gamma = discounted_value
         self.actions_n = env.action_space.n
         self.features_n = features_n
@@ -59,12 +60,13 @@ class ActorCriticAgent(MAEAgent):
         actions_prob = self.actor_net(state)
         m = distributions.Categorical(actions_prob)
         action = m.sample()
-        return action.unsqueeze(0)
+        return action.item()
 
     def optimize_model(self, state, action, reward, state_, action_):
         """
         Use Actor-Critic TD(0) to train net.
         """
+        self.epi += 1
         state = torch.tensor([state], dtype=torch.float)
         state_ = torch.tensor([state_], dtype=torch.float)
         td_error = reward + self.gamma * self.critic_net(state_).squeeze()[action_] \
@@ -74,16 +76,17 @@ class ActorCriticAgent(MAEAgent):
         self.actor_optim.zero_grad()
         q_s_a = self.critic_net(state).squeeze()[action]
         actor_loss = - q_s_a * \
-            math.log(self.actor_net(state).squeeze()[action])
+            torch.log(self.actor_net(state).squeeze()[action])
         actor_loss.backward()
         self.actor_optim.step()
 
         # optim critic net
-        self.critic_optim.zero_grad()
-        critic_loss = F.mse_loss(self.critic_net(state).squeeze()[action],
-                                 reward + self.gamma * self.critic_net(state_).squeeze()[action_])
-        critic_loss.backward()
-        self.critic_optim.step()
+        if self.epi % 10 == 0:
+            self.critic_optim.zero_grad()
+            critic_loss = F.mse_loss(self.critic_net(state).squeeze()[action],
+                                     reward + self.gamma * self.critic_net(state_).squeeze()[action_])
+            critic_loss.backward()
+            self.critic_optim.step()
 
     def save(self):
         """
