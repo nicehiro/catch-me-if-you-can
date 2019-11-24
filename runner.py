@@ -1,16 +1,17 @@
 import time
-import torch
 
 import gym
+import matplotlib.pyplot as plt
+import torch
 
-from agent.actor_critic_agent import ActorCriticAgent
+from agent.a2c_agent import A2CAgent, A2CNet
+from agent.actor_critic_agent import ActorCriticAgent, ActorCriticNet
 from agent.greedy_agent import GreedyAgent
 from agent.greedy_probs_agent import GreedyProbsAgent
 from agent.policy_grad_agent import PolicyGradAgent
-from agent.a2c_agent import A2CAgent, A2CNet
 from grid_world.envs import AgentType
-from utils import get_reverse_action
 from net.policy_net import PolicyNet
+from utils import get_reverse_action
 
 
 def train_runner_with_a2c(env_name,
@@ -44,10 +45,8 @@ def train_runner_with_a2c(env_name,
                          agent_type=AgentType.Chaser,
                          load_path=chaser_restore_path,
                          features_n=4)
-
     env.add_agent(chaser)
     env.add_agent(runner)
-
     for epi in range(episode_count):
         state_map = env.reset()
         chaser_info = state_map[chaser.name]
@@ -57,7 +56,6 @@ def train_runner_with_a2c(env_name,
         chaser_y = chaser_info['state'][1]
         runner_x = runner_info['state'][0]
         runner_y = runner_info['state'][1]
-
         chaser_state = [chaser_x, chaser_y, runner_x, runner_y]
         runner_state = [runner_x, runner_y, chaser_x, chaser_y]
         step = 0
@@ -115,20 +113,21 @@ def train_runner_with_AC(env_name,
                          fps=10):
     """
     Use Actor-Critic TD(0) method to train runner.
+
+    Cannot use batch method to optimize model.
     """
     env = gym.make(env_name)
 
     runner = ActorCriticAgent(
-        default_reward=0.5,
+        default_reward=1,
         name='runner',
         color=(0, 1, 0),
         env=env,
         agent_type=AgentType.Runner,
         features_n=4,
-        discounted_value=0.99,
+        discounted_value=0.9,
         init_value=0.0,
-        actor_learning_rate=5e-7,
-        critic_learning_rate=1e-2,
+        learning_rate=0.00002,
         need_restore=runner_need_restore
     )
 
@@ -143,6 +142,9 @@ def train_runner_with_AC(env_name,
     env.add_agent(chaser)
     env.add_agent(runner)
 
+    total_steps = 0
+
+    loss = []
     for epi in range(episode_count):
         state_map = env.reset()
         chaser_info = state_map[chaser.name]
@@ -156,7 +158,6 @@ def train_runner_with_AC(env_name,
         chaser_state = [chaser_x, chaser_y, runner_x, runner_y]
         runner_state = [runner_x, runner_y, chaser_x, chaser_y]
 
-        runner_action = runner.act(runner_state)
         step = 0
         while True:
             if display:
@@ -168,20 +169,21 @@ def train_runner_with_AC(env_name,
             chaser_state_ = [chaser_x, chaser_y, runner_x, runner_y]
             chaser_state = chaser_state_
             step += 1
+            total_steps += 1
             if step >= 500:
                 # When episode's steps above 500, break up this episode
                 break
             if done:
                 # When chaser chase runner, also need to add new transition
-                r = -10
+                r = -3
                 runner_action = get_reverse_action(action)
                 runner_state_ = [runner_x, runner_y, chaser_x, chaser_y]
-                runner_action_ = runner.act(runner_state_)
-                runner.optimize_model(
-                    runner_state, runner_action, r, runner_state_, runner_action_)
+                # runner.memory.append((runner_state, runner_action, runner_state_, r, done))
+                # loss.append(runner.optimize_model())
                 print('Episode: %d\tsteps: %d' % (epi + 1, step + 1))
                 break
             else:
+                runner_action = runner.act(runner_state)
                 runner_poi, runner_dir, reward, done, _ = env.step(
                     runner_action, runner.name)
                 if display:
@@ -189,18 +191,20 @@ def train_runner_with_AC(env_name,
                     time.sleep(1 / fps)
                 runner_x, runner_y = runner_poi[0], runner_poi[1]
                 runner_state_ = [runner_x, runner_y, chaser_x, chaser_y]
-                runner_action_ = runner.act(runner_state_)
-                runner.optimize_model(
-                    runner_state, runner_action, reward, runner_state_, runner_action_)
+                runner.memory.append((runner_state, runner_action, runner_state_, reward, done))
                 runner_state = runner_state_
-                runner_action = runner_action_
                 step += 1
+                total_steps += 1
                 if done:
+                    loss.append(runner.optimize_model())
                     print('Episode: %d\tsteps: %d' % (epi + 1, step + 1))
                     break
         # 每个回合结束保存模型
         if epi % 100 == 0:
             runner.save()
+    plt.figure()
+    plt.plot(loss)
+    plt.show()
 
 
 def train_runner(env_name,
@@ -367,22 +371,23 @@ if __name__ == '__main__':
     #                       episode_count=40000,
     #                       display=False,
     #                       fps=10)
-    # train_runner_with_AC(env,
-    #                      runner_need_restore=True,
-    #                      chaser_restore_path='./model/chaser-1000.pkl',
-    #                      episode_count=20000,
-    #                      display=False,
-    #                      fps=10)
+    train_runner_with_AC(env,
+                         runner_need_restore=True,
+                         chaser_restore_path='./model/chaser-2000.pkl',
+                         episode_count=20000,
+                         display=False,
+                         fps=10)
     a2c_net = A2CNet(4, 4)
     a2c_net.load_state_dict(torch.load('./model/a2c_runner.pkl'))
     a2c_net = a2c_net.probs
 
-    ac_net = PolicyNet(4, 4, 50, 50, 50)
-    ac_net.load_state_dict(torch.load('./model/runner-success.pkl'))
+    ac_net = ActorCriticNet(4, 4)
+    ac_net.load_state_dict(torch.load('./model/ac.pkl'))
+    ac_net = ac_net.pi
 
     runner_greedy(env,
                   episode_count=100,
-                  chaser_restore_path='./model/chaser-1000.pkl',
+                  chaser_restore_path='./model/chaser-2000.pkl',
                   display=True,
                   fps=10,
                   policy_net=ac_net)

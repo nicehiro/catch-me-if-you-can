@@ -109,7 +109,7 @@ def chaser_dqn(env_name,
                 print('Target net params Replaced!')
                 chaser.target_net.load_state_dict(
                     chaser.policy_net.state_dict())
-                chaser.save('chaser-1000.pkl')
+                chaser.save('chaser-2000.pkl')
 
 
 def greedy_chaser(env_name,
@@ -181,7 +181,7 @@ def greedy_chaser(env_name,
 
 if __name__ == '__main__':
     env = 'multi-agent-8x8-v0'
-    # chaser_dqn(env, episode_count=10000, display=False, fps=100, need_reload=True,
-    #            reload_path='./model/chaser-1000.pkl')
+    # chaser_dqn(env, episode_count=40000, display=False, fps=100, need_reload=False,
+    #            reload_path='./model/chaser-2000.pkl')
     # Observe result
     greedy_chaser(env, episode_count=1000, load_path='./model/chaser-1000.pkl')

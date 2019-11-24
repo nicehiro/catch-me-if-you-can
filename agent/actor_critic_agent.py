@@ -1,18 +1,48 @@
-import math
-
 import torch
 import torch.distributions as distributions
+import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
 from grid_world.envs import MAEAgent
-from net.dqn import DQN
-from net.policy_net import PolicyNet
+from utils import ReplayMemory
+
+
+class ActorCriticNet(nn.Module):
+    """
+    Actor Critic Net.
+
+    Contains two outputs, one is policy probs, another is value output.
+    """
+
+    def __init__(self, features_n, outputs_n):
+        super(ActorCriticNet, self).__init__()
+        self.layer1 = nn.Linear(features_n, 256)
+        # torch.nn.init.normal_(self.layer1.weight)
+        self.layer2 = nn.Linear(256, 256)
+        self.layer3 = nn.Linear(256, 256)
+        # policy net
+        self.layer_pi = nn.Linear(256, outputs_n)
+        # value net
+        self.layer_v = nn.Linear(256, 1)
+
+    def pi(self, x):
+        x = torch.relu(self.layer1(x))
+        x = torch.relu(self.layer2(x))
+        x = torch.relu(self.layer3(x))
+        x = self.layer_pi(x)
+        return F.softmax(x, dim=1)
+
+    def v(self, x):
+        x = torch.relu(self.layer1(x))
+        x = torch.relu(self.layer2(x))
+        x = torch.relu(self.layer3(x))
+        return self.layer_v(x)
 
 
 class ActorCriticAgent(MAEAgent):
     """
-    This agent has actor net and critic net.
+    This agent use actor critic algorithm optimize model.
     """
 
     def __init__(self,
@@ -24,8 +54,7 @@ class ActorCriticAgent(MAEAgent):
                  features_n,
                  discounted_value,
                  init_value=0.0,
-                 actor_learning_rate=0.01,
-                 critic_learning_rate=0.01,
+                 learning_rate=0.001,
                  need_restore=False):
         super().__init__(
             (0, 0),
@@ -36,19 +65,14 @@ class ActorCriticAgent(MAEAgent):
             default_type=agent_type,
             default_value=init_value
         )
-        self.epi = 0
         self.gamma = discounted_value
         self.actions_n = env.action_space.n
         self.features_n = features_n
-        self.actor_lr = actor_learning_rate
-        self.critic_lr = critic_learning_rate
-        self.actor_net = PolicyNet(self.features_n, self.actions_n, 50, 50, 50)
-        self.critic_net = DQN(self.features_n, self.actions_n, 50, 50, 50,)
-        self.actor_optim = optim.Adam(
-            self.actor_net.parameters(), lr=self.actor_lr)
-        self.critic_optim = optim.RMSprop(
-            self.critic_net.parameters(), lr=self.critic_lr)
+        self.lr = learning_rate
         self.save_file_path = './model/'
+        self.net = ActorCriticNet(self.features_n, self.actions_n)
+        self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr)
+        self.memory = []
         if need_restore:
             self.restore()
 
@@ -57,48 +81,55 @@ class ActorCriticAgent(MAEAgent):
         Chose action with probability.
         """
         state = torch.tensor([state], dtype=torch.float)
-        actions_prob = self.actor_net(state)
+        actions_prob = self.net.pi(state)
+        # print(state)
+        print(actions_prob)
         m = distributions.Categorical(actions_prob)
         action = m.sample()
+        # print(action.item())
         return action.item()
 
-    def optimize_model(self, state, action, reward, state_, action_):
+    def optimize_model(self):
         """
         Use Actor-Critic TD(0) to train net.
         """
-        self.epi += 1
-        state = torch.tensor([state], dtype=torch.float)
-        state_ = torch.tensor([state_], dtype=torch.float)
-        td_error = reward + self.gamma * self.critic_net(state_).squeeze()[action_] \
-            - self.critic_net(state).squeeze()[action]
+        state, action, state_, reward, done = [], [], [], [], []
+        for trans in self.memory:
+            state.append(trans[0])
+            action.append(trans[1])
+            state_.append(trans[2])
+            reward.append(trans[3]/100)
+            done.append(0.0 if trans[4] else 1.0)
+        state = torch.tensor(state, dtype=torch.float)
+        state_ = torch.tensor(state_, dtype=torch.float)
+        reward = torch.tensor(reward, dtype=torch.float).unsqueeze(1)
+        done = torch.tensor(done, dtype=torch.float).unsqueeze(1)
 
-        # optim actor net
-        self.actor_optim.zero_grad()
-        q_s_a = self.critic_net(state).squeeze()[action]
-        actor_loss = - q_s_a * \
-            torch.log(self.actor_net(state).squeeze()[action])
-        actor_loss.backward()
-        self.actor_optim.step()
+        td_target = reward + self.gamma * self.net.v(state_) * done
+        td_error = td_target - self.net.v(state)
+        pi = self.net.pi(state)
+        action = torch.tensor(action).unsqueeze(1)
+        pi_a = pi.gather(1, action)
+        # use detach() make this tensor a copy
+        loss = -torch.log(pi_a) * td_error.detach() + \
+            F.smooth_l1_loss(self.net.v(state), td_target.detach())
 
-        # optim critic net
-        if self.epi % 10 == 0:
-            self.critic_optim.zero_grad()
-            critic_loss = F.mse_loss(self.critic_net(state).squeeze()[action],
-                                     reward + self.gamma * self.critic_net(state_).squeeze()[action_])
-            critic_loss.backward()
-            self.critic_optim.step()
+        self.optimizer.zero_grad()
+        loss.mean().backward()
+        self.optimizer.step()
+        self.memory.clear()
+        return loss.mean().item()
 
     def save(self):
         """
         Save trained model.
         """
-        torch.save(self.actor_net.state_dict(),
-                   self.save_file_path + 'actor.pkl')
-        torch.save(self.critic_net.state_dict(),
-                   self.save_file_path + 'critic.pkl')
+        torch.save(self.net.state_dict(),
+                   self.save_file_path + 'ac.pkl')
 
     def restore(self):
-        self.actor_net.load_state_dict(
-            torch.load(self.save_file_path + 'actor.pkl'))
-        self.critic_net.load_state_dict(
-            torch.load(self.save_file_path + 'critic.pkl'))
+        """
+        Restore model from saved file.
+        """
+        self.net.load_state_dict(
+            torch.load(self.save_file_path + 'ac.pkl'))

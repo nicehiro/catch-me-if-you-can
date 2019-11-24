@@ -4,3 +4,4 @@ model/
 .vscode/
 *.npy
 algorithms/
+*.pk

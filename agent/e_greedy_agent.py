@@ -23,7 +23,7 @@ class EGreedyAgent(MAEAgent):
                  features_n,
                  memory_capacity,
                  init_value=0.0,
-                 batch_size=256,
+                 batch_size=64,
                  gamma=0.99,
                  eps_start=0.9,
                  eps_end=0.01,
@@ -61,7 +61,7 @@ class EGreedyAgent(MAEAgent):
         # let target net has the same params as policy net
         self.target_net.eval()
         self.target_net.load_state_dict(self.policy_net.state_dict())
-        self.optimizer = optim.RMSprop(self.policy_net.parameters(), lr=0.01)
+        self.optimizer = optim.RMSprop(self.policy_net.parameters(), lr=0.001)
         self.save_file_path = './model/'
         self.need_exploit = need_exploit
 
@@ -73,7 +73,7 @@ class EGreedyAgent(MAEAgent):
         state = torch.FloatTensor([state])
         sample = random.random()
         # chose action randomly at the beginning, then slowly chose max Q_value
-        eps_threhold = self.ep.s_end + (self.eps_start - self.eps_end) * \
+        eps_threhold = self.eps_end + (self.eps_start - self.eps_end) * \
             math.exp(-1. * self.steps_count / self.eps_decay) \
                 if self.need_exploit else 0.01
         self.steps_count += 1
