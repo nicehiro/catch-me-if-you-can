@@ -27,6 +27,12 @@ class ActorCriticNet(nn.Module):
         self.layer_v = nn.Linear(256, 1)
 
     def pi(self, x):
+        """
+        Policy net output.
+
+        :param x: input tensor
+        :return: every action's prob
+        """
         x = torch.relu(self.layer1(x))
         x = torch.relu(self.layer2(x))
         x = torch.relu(self.layer3(x))
@@ -34,6 +40,12 @@ class ActorCriticNet(nn.Module):
         return F.softmax(x, dim=1)
 
     def v(self, x):
+        """
+        Value net output.
+
+        :param x: input tensor
+        :return: Q value
+        """
         x = torch.relu(self.layer1(x))
         x = torch.relu(self.layer2(x))
         x = torch.relu(self.layer3(x))
@@ -69,7 +81,7 @@ class ActorCriticAgent(MAEAgent):
         self.actions_n = env.action_space.n
         self.features_n = features_n
         self.lr = learning_rate
-        self.save_file_path = './model/'
+        self.save_file_path = '../../model/'
         self.net = ActorCriticNet(self.features_n, self.actions_n)
         self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr)
         self.memory = []
@@ -105,12 +117,15 @@ class ActorCriticAgent(MAEAgent):
         reward = torch.tensor(reward, dtype=torch.float).unsqueeze(1)
         done = torch.tensor(done, dtype=torch.float).unsqueeze(1)
 
+        # Use TD(0)
+        # TD-target = reward + gamma * Q(state_)
         td_target = reward + self.gamma * self.net.v(state_) * done
+        # TD-error = TD-target - Q(state)
         td_error = td_target - self.net.v(state)
         pi = self.net.pi(state)
         action = torch.tensor(action).unsqueeze(1)
         pi_a = pi.gather(1, action)
-        # use detach() make this tensor a copy
+        # use detach() get this tensor a copy
         loss = -torch.log(pi_a) * td_error.detach() + \
             F.smooth_l1_loss(self.net.v(state), td_target.detach())
 

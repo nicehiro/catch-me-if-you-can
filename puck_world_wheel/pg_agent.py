@@ -3,7 +3,7 @@ import torch
 import torch.distributions as distributions
 import torch.nn as nn
 import torch.optim as optim
-from puck_world.envs import AgentWithWheel
+from puck_world.envs import AgentWithWheel, PuckWorldWheel
 
 
 class PolicyNet(nn.Module):
@@ -18,24 +18,32 @@ class PolicyNet(nn.Module):
         self.l3 = nn.Linear(200, 200)
         self.l4 = nn.Linear(200, outputs_n)
 
-        self.l4 = nn.Linear(features_n, 200)
-        self.l5 = nn.Linear(200, 200)
+        self.l5 = nn.Linear(features_n, 200)
         self.l6 = nn.Linear(200, 200)
-        self.l7 = nn.Linear(200, outputs_n)
+        self.l7 = nn.Linear(200, 200)
+        self.l8 = nn.Linear(200, outputs_n)
+
+        self.layers = [self.l1, self.l2, self.l3, self.l5, self.l6, self.l7]
+        self.init_layers()
 
     def forward(self, x):
-        left = torch.tanh(self.layer1(x))
-        left = torch.tanh(self.layer2(left))
-        left = torch.tanh(self.layer3(left))
-        left = self.layer4(left)
+        left = torch.relu(self.l1(x))
+        left = torch.relu(self.l2(left))
+        left = torch.relu(self.l3(left))
+        left = self.l4(left)
         left = torch.softmax(left, dim=-1)
 
-        right = torch.tanh(self.layer1(x))
-        right = torch.tanh(self.layer2(right))
-        right = torch.tanh(self.layer3(right))
-        right = self.layer4(right)
+        right = torch.relu(self.l5(x))
+        right = torch.relu(self.l6(right))
+        right = torch.relu(self.l7(right))
+        right = self.l8(right)
         right = torch.softmax(right, dim=-1)
         return left, right
+
+    def init_layers(self):
+        for layer in self.layers:
+            torch.nn.init.normal_(layer.weight, mean=0.0, std=0.001)
+            torch.nn.init.zeros_(layer.bias)
 
 
 class PolicyGradAgent(AgentWithWheel):
@@ -51,7 +59,6 @@ class PolicyGradAgent(AgentWithWheel):
                  features_n,
                  actions_n,
                  discounted_value,
-                 restore_path,
                  learning_rate=0.01,
                  need_restore=False):
         super().__init__(x, y, r, color, agent_type)
@@ -68,7 +75,7 @@ class PolicyGradAgent(AgentWithWheel):
         self.save_file_path = 'model/pg.pkl'
         self.eps = np.finfo(np.float).eps.item()
         if need_restore:
-            self.restore(restore_path)
+            self.restore(self.save_file_path)
 
     def act(self, state):
         """Chose action with probability.
@@ -78,12 +85,12 @@ class PolicyGradAgent(AgentWithWheel):
         m1 = distributions.Categorical(left_actions_prob)
         m2 = distributions.Categorical(right_actions_prob)
         # print(state)
-        # print(actions_prob)
+        print('left: %s\tright: %s' % (left_actions_prob, right_actions_prob))
         left_action = m1.sample()
         right_action = m2.sample()
         self.left_actions_prob.append(m1.log_prob(left_action))
         self.right_actions_prob.append(m2.log_prob(right_action))
-        return left_action.unsqueeze(0), right_action.unsqueeze(0)
+        return left_action.squeeze().item(), right_action.squeeze().item()
 
     def _discount_and_norm_rewards(self):
         """Calc every state's return when an episode finished.
@@ -125,6 +132,7 @@ class PolicyGradAgent(AgentWithWheel):
         return loss.item()
 
     def save(self):
+        print('Model saved succeed!')
         torch.save(self.policy_net.state_dict(), self.save_file_path)
 
     def restore(self):

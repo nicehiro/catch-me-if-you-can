@@ -115,12 +115,12 @@ def train_runner_with_AC(env_name,
 
 if __name__ == '__main__':
     env = 'multi-agent-8x8-v0'
-    # train_runner_with_AC(env,
-    #                      runner_need_restore=True,
-    #                      chaser_restore_path='../../model/chaser-2000.pkl',
-    #                      episode_count=20000,
-    #                      display=False,
-    #                      fps=10)
+    train_runner_with_AC(env,
+                         runner_need_restore=True,
+                         chaser_restore_path='../../model/chaser-2000.pkl',
+                         episode_count=20000,
+                         display=False,
+                         fps=10)
     ac_net = ActorCriticNet(4, 4)
     ac_net.load_state_dict(torch.load('../../model/ac.pkl'))
     ac_net = ac_net.pi

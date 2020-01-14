@@ -181,7 +181,7 @@ def greedy_chaser(env_name,
 
 if __name__ == '__main__':
     env = 'multi-agent-8x8-v0'
-    # chaser_dqn(env, episode_count=40000, display=False, fps=100, need_reload=False,
-    #            reload_path='./model/chaser-2000.pkl')
+    chaser_dqn(env, episode_count=40000, display=False, fps=100, need_reload=False,
+               reload_path='./model/chaser-2000.pkl')
     # Observe result
-    greedy_chaser(env, episode_count=1000, load_path='../../model/chaser-2000.pkl')
+    # greedy_chaser(env, episode_count=1000, load_path='../../model/chaser-2000.pkl')
